@@ -2,8 +2,8 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Flag Battle: Broadcast Mode</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Flag Battle: Stream Control</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
     <style>
         /* --- SPACE BACKGROUND --- */
@@ -26,28 +26,12 @@
             backdrop-filter: blur(5px);
         }
 
-        /* FULL SCREEN BUTTON (Bottom Right) */
-        #fs-btn {
-            position: absolute; bottom: 20px; right: 20px;
-            background: rgba(0, 0, 0, 0.6);
-            border: 2px solid #00d2ff;
-            color: #00d2ff;
-            padding: 10px;
-            border-radius: 8px;
-            cursor: pointer;
-            z-index: 200;
-            transition: all 0.3s;
-            display: flex; align-items: center; justify-content: center;
-        }
-        #fs-btn:hover { background: #00d2ff; color: black; box-shadow: 0 0 15px #00d2ff; }
-        #fs-icon { width: 24px; height: 24px; fill: currentColor; }
-
         /* TOP CENTER COUNTER */
         #top-ui { position: absolute; top: 10px; width: 100%; text-align: center; pointer-events: none; z-index: 20; }
         h1 { margin: 0; font-size: 22px; color: #fff; text-shadow: 0 0 10px #00d2ff; letter-spacing: 2px; opacity: 0.8; }
         #counter { font-size: 48px; font-weight: 900; color: #ff0055; text-shadow: 2px 2px 0 #fff; margin-top: 0px; }
 
-        /* LEFT: SCROLLING LEADERBOARD */
+        /* LEFT: LEADERBOARD */
         #leaderboard { 
             position: absolute; top: 20px; left: 20px; 
             width: 170px; height: 250px; overflow: hidden; 
@@ -58,7 +42,7 @@
         .lb-item { display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 13px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 2px;}
         .lb-score { color: #ffd700; font-weight: bold; }
 
-        /* RIGHT: SCROLLING SURVIVORS */
+        /* RIGHT: TICKER */
         #ticker-box {
             position: absolute; top: 20px; right: 20px; 
             width: 170px; height: 250px; overflow: hidden; z-index: 20; border-color: #ff0055;
@@ -69,7 +53,7 @@
 
         @keyframes scrollUp { 0% { transform: translateY(0); } 100% { transform: translateY(-100%); } }
 
-        /* AUTO WINNER SCREEN */
+        /* WINNER SCREEN */
         #winner-screen {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.92); display: none;
@@ -87,6 +71,34 @@
         #cta-text { font-size: 20px; color: #fff; margin-top: 10px; animation: blink 1s infinite; }
         @keyframes blink { 50% { opacity: 0.5; } }
 
+        /* --- SETTINGS MENU --- */
+        #settings-btn {
+            position: absolute; bottom: 20px; right: 20px;
+            width: 50px; height: 50px;
+            background: rgba(0,0,0,0.7); border: 2px solid #fff; border-radius: 50%;
+            display: flex; justify-content: center; align-items: center;
+            cursor: pointer; z-index: 200; font-size: 24px; transition: transform 0.3s;
+        }
+        #settings-btn:hover { transform: rotate(90deg); background: #333; }
+
+        #settings-modal {
+            position: absolute; bottom: 80px; right: 20px;
+            width: 250px; background: rgba(0, 10, 20, 0.95);
+            border: 2px solid #00d2ff; border-radius: 10px;
+            padding: 15px; display: none; flex-direction: column; gap: 10px;
+            z-index: 200; box-shadow: 0 0 20px rgba(0,0,0,0.8);
+        }
+        .control-group { display: flex; flex-direction: column; gap: 5px; }
+        .control-label { font-size: 12px; color: #00d2ff; font-weight: bold; }
+        input[type=range] { width: 100%; cursor: pointer; }
+        
+        .action-btn {
+            background: #ff0055; color: white; border: none; padding: 10px;
+            border-radius: 5px; font-weight: bold; cursor: pointer; margin-top: 5px;
+        }
+        .action-btn:hover { background: #ff3377; }
+        .close-settings { text-align: right; color: #aaa; cursor: pointer; font-size: 12px; }
+
     </style>
 </head>
 <body>
@@ -94,11 +106,23 @@
     <div class="stars"></div>
     <div class="twinkling"></div>
 
-    <button id="fs-btn" title="Toggle Full Screen">
-        <svg id="fs-icon" viewBox="0 0 24 24">
-            <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>
-        </svg>
-    </button>
+    <div id="settings-btn" onclick="toggleSettings()">⚙️</div>
+
+    <div id="settings-modal">
+        <div class="close-settings" onclick="toggleSettings()">Close ✖</div>
+        
+        <div class="control-group">
+            <label class="control-label">Ring Speed</label>
+            <input type="range" id="speed-ring" min="1" max="10" value="3">
+        </div>
+
+        <div class="control-group">
+            <label class="control-label">Flag Bounce (Chaos)</label>
+            <input type="range" id="speed-chaos" min="1" max="10" value="3">
+        </div>
+
+        <button class="action-btn" onclick="resetLeaderboard()">🗑️ RESET WINNERS</button>
+    </div>
 
     <div id="leaderboard" class="ui-box">
         <h3>🏆 TOTAL WINS</h3>
@@ -131,56 +155,14 @@
     <div id="canvas-container"></div>
 
     <script>
-        // --- SOUND SETUP (Wait for Interaction) ---
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        
-        function playSound(type) {
-            // Auto-resume if suspended (Browser policy)
-            if (audioCtx.state === 'suspended') audioCtx.resume();
+        // --- SETTINGS VARIABLES ---
+        let currentRingSpeed = 0.025; // Default
+        let currentChaos = 0.002;     // Default
 
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            osc.connect(gain); gain.connect(audioCtx.destination);
-            const now = audioCtx.currentTime;
-            
-            if (type === 'hit') {
-                osc.type = 'triangle';
-                osc.frequency.setValueAtTime(200 + Math.random()*100, now);
-                osc.frequency.exponentialRampToValueAtTime(50, now+0.05);
-                gain.gain.setValueAtTime(0.05, now); gain.gain.linearRampToValueAtTime(0, now+0.05);
-                osc.start(now); osc.stop(now+0.05);
-            } else if (type === 'out') {
-                osc.type = 'sawtooth'; osc.frequency.setValueAtTime(400, now);
-                osc.frequency.exponentialRampToValueAtTime(50, now+0.3);
-                gain.gain.setValueAtTime(0.08, now); gain.gain.linearRampToValueAtTime(0, now+0.3);
-                osc.start(now); osc.stop(now+0.3);
-            }
+        function toggleSettings() {
+            const el = document.getElementById('settings-modal');
+            el.style.display = el.style.display === 'flex' ? 'none' : 'flex';
         }
-
-        // --- FULL SCREEN TOGGLE LOGIC ---
-        const fsBtn = document.getElementById('fs-btn');
-        const fsIcon = document.getElementById('fs-icon');
-
-        // SVG Paths
-        const pathZoomIn = "M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z";
-        const pathZoomOut = "M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-14v3h3v2h-5V5h2z";
-
-        fsBtn.addEventListener('click', () => {
-            // Also enable sound on first click!
-            if (audioCtx.state === 'suspended') audioCtx.resume();
-
-            if (!document.fullscreenElement) {
-                document.documentElement.requestFullscreen().catch(err => {
-                    console.log(`Error attempting to enable full-screen mode: ${err.message}`);
-                });
-                fsIcon.innerHTML = `<path d="${pathZoomOut}"/>`; // Change to Compress icon
-            } else {
-                if (document.exitFullscreen) {
-                    document.exitFullscreen();
-                    fsIcon.innerHTML = `<path d="${pathZoomIn}"/>`; // Change to Expand icon
-                }
-            }
-        });
 
         // --- PHYSICS SETUP ---
         const Engine = Matter.Engine, Render = Matter.Render, Runner = Matter.Runner,
@@ -198,6 +180,27 @@
             engine: engine,
             options: { width: width, height: height, wireframes: false, background: 'transparent' }
         });
+
+        // --- INPUT LISTENERS (Live Updates) ---
+        document.getElementById('speed-ring').addEventListener('input', (e) => {
+            // Map 1-10 slider to 0.005 - 0.08 speed
+            const val = parseInt(e.target.value);
+            currentRingSpeed = 0.005 + (val * 0.007);
+        });
+
+        document.getElementById('speed-chaos').addEventListener('input', (e) => {
+            // Map 1-10 slider to 0.0005 - 0.006 force
+            const val = parseInt(e.target.value);
+            currentChaos = 0.0005 + (val * 0.0006);
+        });
+
+        function resetLeaderboard() {
+            if(confirm("Are you sure you want to delete all win records?")) {
+                localStorage.removeItem('flagWins');
+                updateLeaderboard(null);
+                toggleSettings(); // Close menu
+            }
+        }
 
         // --- DATA ---
         const countryData = [
@@ -224,6 +227,7 @@
         function updateLeaderboard(winnerName) {
             let data = JSON.parse(localStorage.getItem('flagWins') || '{}');
             if(winnerName) { data[winnerName] = (data[winnerName] || 0) + 1; localStorage.setItem('flagWins', JSON.stringify(data)); }
+            
             const sorted = Object.entries(data).sort((a,b) => b[1] - a[1]);
             document.getElementById('lb-list').innerHTML = sorted.map(([n,s],i)=> 
                 `<div class="lb-item"><span>${i+1}. ${n}</span><span class="lb-score">${s}</span></div>`
@@ -302,17 +306,22 @@
             eliminatedFlags.forEach(b => drawFlag(b, 0.5));
         });
 
-        // --- LOOP ---
+        // --- GAME LOOP ---
         let gameActive = true;
         Events.on(engine, 'beforeUpdate', function() {
             if(!gameActive) return;
 
-            Body.rotate(ring, 0.025);
+            // USE DYNAMIC SPEED VARIABLE
+            Body.rotate(ring, currentRingSpeed);
 
             if (engine.timing.timestamp % 30 === 0) {
                 activeFlags.forEach(b => {
                     if(Math.random() > 0.7) {
-                        Body.applyForce(b, b.position, { x: (Math.random()-0.5)*0.002, y: (Math.random()-0.5)*0.002 });
+                        // USE DYNAMIC CHAOS VARIABLE
+                        Body.applyForce(b, b.position, { 
+                            x: (Math.random()-0.5) * currentChaos, 
+                            y: (Math.random()-0.5) * currentChaos 
+                        });
                     }
                 });
             }
@@ -324,7 +333,6 @@
                 if (dist > ringRadius * 1.5 || b.position.y > ringY + ringRadius + 50) {
                     activeFlags.splice(i, 1);
                     eliminatedFlags.push(b);
-                    playSound('out');
                     document.getElementById('counter').innerText = activeFlags.length;
                     updateTicker(activeFlags);
                     b.restitution = 0.5; b.friction = 0.5;
@@ -353,10 +361,6 @@
                     }
                 }
             }
-        });
-
-        Events.on(engine, 'collisionStart', e => {
-            e.pairs.forEach(p => { if (p.bodyA.speed > 6 || p.bodyB.speed > 6) playSound('hit'); });
         });
 
         Render.run(render);
