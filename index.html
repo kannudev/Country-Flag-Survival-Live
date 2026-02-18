@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Flag Battle: Pile Up</title>
+    <title>Flag Battle: 24/7 Live</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
     <style>
         /* --- SPACE BACKGROUND --- */
@@ -29,40 +29,41 @@
         #top-ui { position: absolute; top: 10px; width: 100%; text-align: center; pointer-events: none; z-index: 20; }
         h1 { margin: 0; font-size: 24px; color: #fff; text-shadow: 0 0 10px #00d2ff; letter-spacing: 1px; }
         #counter { font-size: 42px; font-weight: 900; color: #ff0055; text-shadow: 2px 2px 0 #fff; margin-top: 5px; }
-        .btn { pointer-events: auto; background: #00d2ff; color: #000; border: none; padding: 8px 20px; border-radius: 20px; font-weight: bold; cursor: pointer; margin-top: 5px; }
 
         /* LEFT: LEADERBOARD */
         #leaderboard { position: absolute; top: 20px; left: 20px; width: 160px; max-height: 250px; overflow-y: auto; z-index: 20; font-size: 12px; }
         #leaderboard h3 { color: #ffd700; margin: 0 0 5px 0; border-bottom: 1px solid #555; text-align: center; }
         .lb-item { display: flex; justify-content: space-between; margin-bottom: 3px; }
 
-        /* RIGHT: COMPACT TICKER (Fixed Problem) */
+        /* RIGHT: COMPACT TICKER */
         #ticker-box {
             position: absolute; top: 20px; right: 20px; 
-            width: 180px; 
-            height: 200px; /* Fixed Height - No Overlap */
-            overflow: hidden; /* Hide extra list */
-            z-index: 20;
-            border-color: #ff0055;
+            width: 180px; height: 200px; overflow: hidden; z-index: 20; border-color: #ff0055;
         }
         #ticker-header { color: #ff0055; font-weight: bold; text-align: center; font-size: 14px; margin-bottom: 5px; border-bottom: 1px solid #555; }
-        
-        /* Scrolling Animation for List */
         #ticker-list { list-style: none; padding: 0; margin: 0; text-align: center; animation: scrollUp 20s linear infinite; }
         .ticker-item { font-size: 14px; padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.1); }
-        @keyframes scrollUp { 
-            0% { transform: translateY(0); } 
-            100% { transform: translateY(-100%); } 
-        }
+        @keyframes scrollUp { 0% { transform: translateY(0); } 100% { transform: translateY(-100%); } }
 
-        /* WINNER SCREEN */
+        /* AUTOMATIC WINNER SCREEN */
         #winner-screen {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.9); display: none;
+            background: rgba(0,0,0,0.92); display: none;
             flex-direction: column; justify-content: center; align-items: center; z-index: 100;
+            text-align: center;
         }
         .anim-text { animation: pop 0.5s infinite alternate; }
         @keyframes pop { from { transform: scale(1); } to { transform: scale(1.1); } }
+        
+        #winner-emoji { font-size: 120px; margin-bottom: 10px; }
+        #winner-text { font-size: 50px; color: gold; margin: 0; text-shadow: 0 0 20px gold; text-transform: uppercase;}
+        
+        /* COUNTDOWN TEXT STYLES */
+        #countdown-box { margin-top: 30px; }
+        #timer-text { font-size: 40px; color: #00ffea; font-weight: bold; font-family: monospace; }
+        #cta-text { font-size: 22px; color: #fff; margin-top: 10px; animation: blink 1s infinite; }
+        @keyframes blink { 50% { opacity: 0.5; } }
+
     </style>
 </head>
 <body>
@@ -73,15 +74,11 @@
     <div id="leaderboard" class="ui-box">
         <h3>🏆 Wins</h3>
         <div id="lb-content">Loading...</div>
-        <div style="text-align:center; margin-top:5px;">
-            <button onclick="localStorage.removeItem('flagWins'); updateLeaderboard(null);" style="font-size:10px; cursor:pointer; background:red; color:white; border:none; border-radius:4px;">Reset</button>
-        </div>
     </div>
 
     <div id="top-ui">
         <h1>BATTLE ROYALE</h1>
         <div id="counter">50</div>
-        <button class="btn" onclick="location.reload()">RESTART</button>
     </div>
 
     <div id="ticker-box" class="ui-box">
@@ -92,9 +89,13 @@
     </div>
 
     <div id="winner-screen">
-        <div id="winner-emoji" style="font-size:120px;" class="anim-text"></div>
-        <h1 id="winner-text" style="font-size:60px; color:gold; margin:10px;"></h1>
-        <button class="btn" style="font-size:20px; padding:15px 40px;" onclick="location.reload()">PLAY AGAIN</button>
+        <div id="winner-emoji" class="anim-text"></div>
+        <h1 id="winner-text"></h1>
+        
+        <div id="countdown-box">
+            <div id="timer-text">NEXT ROUND: 10s</div>
+            <div id="cta-text">👇 Comment Your Flag for LUCK! 🍀</div>
+        </div>
     </div>
 
     <div id="canvas-container"></div>
@@ -116,7 +117,6 @@
             options: { width: width, height: height, wireframes: false, background: 'transparent' }
         });
 
-        // --- GAME DATA ---
         const countryData = [
             {code:"IN", name:"India", emoji:"🇮🇳"}, {code:"US", name:"USA", emoji:"🇺🇸"}, {code:"GB", name:"UK", emoji:"🇬🇧"}, 
             {code:"CA", name:"Canada", emoji:"🇨🇦"}, {code:"JP", name:"Japan", emoji:"🇯🇵"}, {code:"BR", name:"Brazil", emoji:"🇧🇷"},
@@ -169,7 +169,6 @@
         updateLeaderboard(null);
 
         function updateTicker(balls) {
-            // Only show active balls
             const list = document.getElementById('ticker-list');
             list.innerHTML = "";
             balls.forEach(b => {
@@ -181,43 +180,33 @@
         }
 
         // --- PHYSICS WORLD SETUP ---
-        
-        // 1. FLOOR & WALLS (To keep piles on screen)
         const floor = Bodies.rectangle(width/2, height + 60, width, 100, { isStatic: true, render:{visible:false} });
         const leftWall = Bodies.rectangle(-50, height, 100, height, { isStatic: true });
         const rightWall = Bodies.rectangle(width+50, height, 100, height, { isStatic: true });
         Composite.add(world, [floor, leftWall, rightWall]);
 
-        // 2. ROTATING RING (Centered, higher up)
         const ringRadius = Math.min(width, height) * 0.35;
-        const ringY = height * 0.45; // Move ring slightly UP so pile fits below
+        const ringY = height * 0.45;
         const segments = 45; 
         const gapSize = 4;
         const ringParts = [];
-        
         for (let i = 0; i < segments; i++) {
             if (i < gapSize) continue;
             const angle = i * (Math.PI * 2) / segments;
             const x = width/2 + Math.cos(angle) * ringRadius;
             const y = ringY + Math.sin(angle) * ringRadius;
-            ringParts.push(Bodies.rectangle(x, y, 45, 15, { 
-                isStatic: true, angle: angle + Math.PI/2, render: { visible: false } 
-            }));
+            ringParts.push(Bodies.rectangle(x, y, 45, 15, { isStatic: true, angle: angle + Math.PI/2, render: { visible: false } }));
         }
         const ring = Body.create({ parts: ringParts, isStatic: true });
         Composite.add(world, ring);
 
-        // 3. SPAWN FLAGS
         const ballSize = Math.max(16, ringRadius / 14);
         let activeFlags = [];
-        let eliminatedFlags = []; // Track who fell out
+        let eliminatedFlags = []; 
 
         countryData.forEach(c => {
             const ball = Bodies.circle(width/2 + (Math.random()-0.5)*50, ringY + (Math.random()-0.5)*50, ballSize, {
-                restitution: 1.05, // EXTRA BOUNCY
-                friction: 0.001,
-                frictionAir: 0.002, // Less air resistance = more movement
-                label: 'ball'
+                restitution: 1.05, friction: 0.001, frictionAir: 0.002, label: 'ball'
             });
             ball.data = c;
             activeFlags.push(ball);
@@ -225,11 +214,9 @@
         Composite.add(world, activeFlags);
         updateTicker(activeFlags);
 
-        // --- RENDER & GAME LOOP ---
+        // --- RENDER LOOP ---
         Events.on(render, 'afterRender', function() {
             const ctx = render.context;
-            
-            // Draw NEON RING
             ctx.shadowBlur = 15; ctx.shadowColor = "#00d2ff"; ctx.fillStyle = "#fff";
             ring.parts.forEach(p => {
                 if (p.label==='Body') return;
@@ -239,10 +226,8 @@
             });
             ctx.shadowBlur = 0;
 
-            // Draw ALL Flags (Active + Eliminated)
             ctx.font = `${ballSize * 1.5}px Arial`;
             ctx.textAlign = "center"; ctx.textBaseline = "middle";
-            
             const drawFlag = (b, opacity) => {
                 ctx.save(); ctx.translate(b.position.x, b.position.y); ctx.rotate(b.angle);
                 ctx.beginPath(); ctx.arc(0,0, ballSize, 0, Math.PI*2);
@@ -250,20 +235,17 @@
                 ctx.fillStyle = "#000"; ctx.fillText(b.data.emoji, 0, 2);
                 ctx.restore();
             };
-
             activeFlags.forEach(b => drawFlag(b, 0.9));
-            eliminatedFlags.forEach(b => drawFlag(b, 0.5)); // Dimmer for fallen
+            eliminatedFlags.forEach(b => drawFlag(b, 0.5));
         });
 
-        // --- UPDATE LOGIC ---
+        // --- GAME LOOP & AUTO RESTART LOGIC ---
         let gameActive = true;
         Events.on(engine, 'beforeUpdate', function() {
             if(!gameActive) return;
 
-            // Rotate Ring
             Body.rotate(ring, 0.025);
 
-            // CHAOS: Random impulses to active flags
             if (engine.timing.timestamp % 30 === 0) {
                 activeFlags.forEach(b => {
                     if(Math.random() > 0.7) {
@@ -272,48 +254,50 @@
                 });
             }
 
-            // CHECK FALLOUT
             for (let i = activeFlags.length - 1; i >= 0; i--) {
                 const b = activeFlags[i];
                 const dist = Math.hypot(b.position.x - width/2, b.position.y - ringY);
                 
-                // If flag falls out of ring area
                 if (dist > ringRadius * 1.5 || b.position.y > ringY + ringRadius + 50) {
-                    
-                    // 1. Move from Active -> Eliminated
                     activeFlags.splice(i, 1);
                     eliminatedFlags.push(b);
-
-                    // 2. Play Sound
                     playSound('out');
-
-                    // 3. Update UI
                     document.getElementById('counter').innerText = activeFlags.length;
                     updateTicker(activeFlags);
-
-                    // 4. IMPORTANT: Don't remove body! Let it hit the floor.
-                    // Reduce bounciness for fallen flags so they settle
-                    b.restitution = 0.5;
-                    b.friction = 0.5;
+                    b.restitution = 0.5; b.friction = 0.5;
 
                     // WIN CONDITION
                     if (activeFlags.length === 1) {
                         gameActive = false;
                         const winner = activeFlags[0];
-                        document.getElementById('winner-screen').style.display = 'flex';
+                        
+                        // Show Winner Screen
+                        const screen = document.getElementById('winner-screen');
+                        screen.style.display = 'flex';
                         document.getElementById('winner-emoji').innerText = winner.data.emoji;
                         document.getElementById('winner-text').innerText = winner.data.name + " WINS!";
                         updateLeaderboard(winner.data.name);
+
+                        // START AUTO RESTART COUNTDOWN
+                        let timeLeft = 10;
+                        const timerText = document.getElementById('timer-text');
+                        
+                        const interval = setInterval(() => {
+                            timeLeft--;
+                            timerText.innerText = `NEXT ROUND: ${timeLeft}s`;
+                            
+                            if (timeLeft <= 0) {
+                                clearInterval(interval);
+                                location.reload(); // REFRESH PAGE
+                            }
+                        }, 1000);
                     }
                 }
             }
         });
 
         Events.on(engine, 'collisionStart', e => {
-            e.pairs.forEach(p => { 
-                // Only sound for active balls hitting fast
-                if (p.bodyA.speed > 6 || p.bodyB.speed > 6) playSound('hit'); 
-            });
+            e.pairs.forEach(p => { if (p.bodyA.speed > 6 || p.bodyB.speed > 6) playSound('hit'); });
         });
 
         Render.run(render);
