@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Flag Battle: 24/7 EPIC LIVE</title>
+    <title>Flag Battle: Broadcast Mode</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
     <style>
         /* --- SPACE BACKGROUND --- */
@@ -26,32 +26,34 @@
             backdrop-filter: blur(5px);
         }
 
-        /* MUSIC START BUTTON */
-        #music-overlay {
-            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            background: #00d2ff; color: #000; padding: 15px 30px;
-            font-size: 20px; font-weight: bold; border-radius: 50px; cursor: pointer;
-            z-index: 200; box-shadow: 0 0 30px #00d2ff; animation: pulse 1.5s infinite;
+        /* FULL SCREEN BUTTON (Bottom Right) */
+        #fs-btn {
+            position: absolute; bottom: 20px; right: 20px;
+            background: rgba(0, 0, 0, 0.6);
+            border: 2px solid #00d2ff;
+            color: #00d2ff;
+            padding: 10px;
+            border-radius: 8px;
+            cursor: pointer;
+            z-index: 200;
+            transition: all 0.3s;
+            display: flex; align-items: center; justify-content: center;
         }
-        @keyframes pulse { 0% {transform:translate(-50%,-50%) scale(1);} 50% {transform:translate(-50%,-50%) scale(1.1);} }
+        #fs-btn:hover { background: #00d2ff; color: black; box-shadow: 0 0 15px #00d2ff; }
+        #fs-icon { width: 24px; height: 24px; fill: currentColor; }
 
         /* TOP CENTER COUNTER */
         #top-ui { position: absolute; top: 10px; width: 100%; text-align: center; pointer-events: none; z-index: 20; }
         h1 { margin: 0; font-size: 22px; color: #fff; text-shadow: 0 0 10px #00d2ff; letter-spacing: 2px; opacity: 0.8; }
         #counter { font-size: 48px; font-weight: 900; color: #ff0055; text-shadow: 2px 2px 0 #fff; margin-top: 0px; }
 
-        /* LEFT: SCROLLING LEADERBOARD (Fixed Height) */
+        /* LEFT: SCROLLING LEADERBOARD */
         #leaderboard { 
             position: absolute; top: 20px; left: 20px; 
-            width: 170px; 
-            height: 250px; /* Fixed Height */
-            overflow: hidden; /* Hide Overflow */
-            z-index: 20; 
-            border-color: #ffd700;
+            width: 170px; height: 250px; overflow: hidden; 
+            z-index: 20; border-color: #ffd700;
         }
         #leaderboard h3 { color: #ffd700; margin: 0 0 5px 0; border-bottom: 1px solid rgba(255,255,255,0.3); text-align: center; font-size: 14px; }
-        
-        /* Auto Scroll Animation for Leaderboard */
         #lb-list { list-style: none; padding: 0; margin: 0; animation: scrollUp 15s linear infinite; }
         .lb-item { display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 13px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 2px;}
         .lb-score { color: #ffd700; font-weight: bold; }
@@ -65,12 +67,9 @@
         #ticker-list { list-style: none; padding: 0; margin: 0; text-align: center; animation: scrollUp 20s linear infinite; }
         .ticker-item { font-size: 13px; padding: 3px 0; border-bottom: 1px solid rgba(255,255,255,0.1); }
 
-        @keyframes scrollUp { 
-            0% { transform: translateY(0); } 
-            100% { transform: translateY(-100%); } 
-        }
+        @keyframes scrollUp { 0% { transform: translateY(0); } 100% { transform: translateY(-100%); } }
 
-        /* WINNER SCREEN (Auto) */
+        /* AUTO WINNER SCREEN */
         #winner-screen {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.92); display: none;
@@ -92,23 +91,21 @@
 </head>
 <body>
 
-    <audio id="bg-music" loop>
-        <source src="https://incompetech.com/music/royalty-free/mp3-royaltyfree/Volatile%20Reaction.mp3" type="audio/mp3">
-    </audio>
-
     <div class="stars"></div>
     <div class="twinkling"></div>
 
-    <div id="music-overlay" onclick="startEverything()">
-        🔴 TAP TO START LIVE
-    </div>
+    <button id="fs-btn" title="Toggle Full Screen">
+        <svg id="fs-icon" viewBox="0 0 24 24">
+            <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>
+        </svg>
+    </button>
 
     <div id="leaderboard" class="ui-box">
         <h3>🏆 TOTAL WINS</h3>
         <div style="overflow:hidden; height:210px; position:relative;">
             <div id="lb-list">Loading...</div>
         </div>
-        </div>
+    </div>
 
     <div id="top-ui">
         <h1>BATTLE ROYALE</h1>
@@ -134,17 +131,56 @@
     <div id="canvas-container"></div>
 
     <script>
-        // --- STARTUP ---
-        function startEverything() {
-            const music = document.getElementById('bg-music');
-            music.volume = 0.5;
-            music.play().then(() => {
-                document.getElementById('music-overlay').style.display = 'none';
-            }).catch(e => console.log("Audio Error:", e));
+        // --- SOUND SETUP (Wait for Interaction) ---
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        
+        function playSound(type) {
+            // Auto-resume if suspended (Browser policy)
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            const now = audioCtx.currentTime;
+            
+            if (type === 'hit') {
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(200 + Math.random()*100, now);
+                osc.frequency.exponentialRampToValueAtTime(50, now+0.05);
+                gain.gain.setValueAtTime(0.05, now); gain.gain.linearRampToValueAtTime(0, now+0.05);
+                osc.start(now); osc.stop(now+0.05);
+            } else if (type === 'out') {
+                osc.type = 'sawtooth'; osc.frequency.setValueAtTime(400, now);
+                osc.frequency.exponentialRampToValueAtTime(50, now+0.3);
+                gain.gain.setValueAtTime(0.08, now); gain.gain.linearRampToValueAtTime(0, now+0.3);
+                osc.start(now); osc.stop(now+0.3);
+            }
         }
 
-        // Auto-click attempt
-        window.onload = () => { document.getElementById('bg-music').play().catch(()=>{}); };
+        // --- FULL SCREEN TOGGLE LOGIC ---
+        const fsBtn = document.getElementById('fs-btn');
+        const fsIcon = document.getElementById('fs-icon');
+
+        // SVG Paths
+        const pathZoomIn = "M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z";
+        const pathZoomOut = "M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-14v3h3v2h-5V5h2z";
+
+        fsBtn.addEventListener('click', () => {
+            // Also enable sound on first click!
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(err => {
+                    console.log(`Error attempting to enable full-screen mode: ${err.message}`);
+                });
+                fsIcon.innerHTML = `<path d="${pathZoomOut}"/>`; // Change to Compress icon
+            } else {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                    fsIcon.innerHTML = `<path d="${pathZoomIn}"/>`; // Change to Expand icon
+                }
+            }
+        });
 
         // --- PHYSICS SETUP ---
         const Engine = Matter.Engine, Render = Matter.Render, Runner = Matter.Runner,
@@ -184,38 +220,11 @@
             {code:"AE", name:"UAE", emoji:"🇦🇪"}, {code:"QA", name:"Qatar", emoji:"🇶🇦"}
         ];
 
-        // --- SOUND EFFECTS ---
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        function playSound(type) {
-            if (audioCtx.state === 'suspended') audioCtx.resume();
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            osc.connect(gain); gain.connect(audioCtx.destination);
-            const now = audioCtx.currentTime;
-            
-            if (type === 'hit') {
-                osc.type = 'triangle'; // Sharper hit
-                osc.frequency.setValueAtTime(200 + Math.random()*100, now);
-                osc.frequency.exponentialRampToValueAtTime(50, now+0.05);
-                gain.gain.setValueAtTime(0.05, now); gain.gain.linearRampToValueAtTime(0, now+0.05);
-                osc.start(now); osc.stop(now+0.05);
-            } else if (type === 'out') {
-                osc.type = 'sawtooth'; osc.frequency.setValueAtTime(400, now);
-                osc.frequency.exponentialRampToValueAtTime(50, now+0.3);
-                gain.gain.setValueAtTime(0.08, now); gain.gain.linearRampToValueAtTime(0, now+0.3);
-                osc.start(now); osc.stop(now+0.3);
-            }
-        }
-
-        // --- UI UPDATES (SCROLLING) ---
+        // --- UI UPDATES ---
         function updateLeaderboard(winnerName) {
             let data = JSON.parse(localStorage.getItem('flagWins') || '{}');
             if(winnerName) { data[winnerName] = (data[winnerName] || 0) + 1; localStorage.setItem('flagWins', JSON.stringify(data)); }
-            
-            // Convert to array and sort
             const sorted = Object.entries(data).sort((a,b) => b[1] - a[1]);
-            
-            // Build Scrolling List
             document.getElementById('lb-list').innerHTML = sorted.map(([n,s],i)=> 
                 `<div class="lb-item"><span>${i+1}. ${n}</span><span class="lb-score">${s}</span></div>`
             ).join('') || "<div style='text-align:center'>No Data</div>";
