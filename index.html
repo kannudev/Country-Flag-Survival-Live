@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Flag Battle: 24/7 Live</title>
+    <title>Flag Battle: 24/7 EPIC LIVE</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
     <style>
         /* --- SPACE BACKGROUND --- */
-        body { margin: 0; padding: 0; overflow: hidden; background: #000; font-family: 'Segoe UI', sans-serif; color: white; }
+        body { margin: 0; padding: 0; overflow: hidden; background: #000; font-family: 'Segoe UI', sans-serif; color: white; user-select: none; }
         .stars, .twinkling { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: block; }
         .stars { background: #000 url('https://s3-us-west-2.amazonaws.com/s.cdpn.io/1231630/stars.png') repeat top center; z-index: 0; }
         .twinkling { background: transparent url('https://s3-us-west-2.amazonaws.com/s.cdpn.io/1231630/twinkling.png') repeat top center; z-index: 1; animation: move-twink-back 200s linear infinite; opacity: 0.5; }
@@ -17,35 +17,60 @@
 
         /* --- UI DESIGN --- */
         .ui-box {
-            background: rgba(0, 15, 30, 0.85);
+            background: rgba(0, 10, 20, 0.85);
             border: 2px solid #00d2ff;
-            border-radius: 12px;
+            border-radius: 10px;
             padding: 10px;
-            box-shadow: 0 0 15px rgba(0, 210, 255, 0.3);
+            box-shadow: 0 0 15px rgba(0, 210, 255, 0.2);
             pointer-events: auto;
+            backdrop-filter: blur(5px);
         }
 
-        /* TOP CENTER */
+        /* MUSIC START BUTTON */
+        #music-overlay {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: #00d2ff; color: #000; padding: 15px 30px;
+            font-size: 20px; font-weight: bold; border-radius: 50px; cursor: pointer;
+            z-index: 200; box-shadow: 0 0 30px #00d2ff; animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse { 0% {transform:translate(-50%,-50%) scale(1);} 50% {transform:translate(-50%,-50%) scale(1.1);} }
+
+        /* TOP CENTER COUNTER */
         #top-ui { position: absolute; top: 10px; width: 100%; text-align: center; pointer-events: none; z-index: 20; }
-        h1 { margin: 0; font-size: 24px; color: #fff; text-shadow: 0 0 10px #00d2ff; letter-spacing: 1px; }
-        #counter { font-size: 42px; font-weight: 900; color: #ff0055; text-shadow: 2px 2px 0 #fff; margin-top: 5px; }
+        h1 { margin: 0; font-size: 22px; color: #fff; text-shadow: 0 0 10px #00d2ff; letter-spacing: 2px; opacity: 0.8; }
+        #counter { font-size: 48px; font-weight: 900; color: #ff0055; text-shadow: 2px 2px 0 #fff; margin-top: 0px; }
 
-        /* LEFT: LEADERBOARD */
-        #leaderboard { position: absolute; top: 20px; left: 20px; width: 160px; max-height: 250px; overflow-y: auto; z-index: 20; font-size: 12px; }
-        #leaderboard h3 { color: #ffd700; margin: 0 0 5px 0; border-bottom: 1px solid #555; text-align: center; }
-        .lb-item { display: flex; justify-content: space-between; margin-bottom: 3px; }
+        /* LEFT: SCROLLING LEADERBOARD (Fixed Height) */
+        #leaderboard { 
+            position: absolute; top: 20px; left: 20px; 
+            width: 170px; 
+            height: 250px; /* Fixed Height */
+            overflow: hidden; /* Hide Overflow */
+            z-index: 20; 
+            border-color: #ffd700;
+        }
+        #leaderboard h3 { color: #ffd700; margin: 0 0 5px 0; border-bottom: 1px solid rgba(255,255,255,0.3); text-align: center; font-size: 14px; }
+        
+        /* Auto Scroll Animation for Leaderboard */
+        #lb-list { list-style: none; padding: 0; margin: 0; animation: scrollUp 15s linear infinite; }
+        .lb-item { display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 13px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 2px;}
+        .lb-score { color: #ffd700; font-weight: bold; }
 
-        /* RIGHT: COMPACT TICKER */
+        /* RIGHT: SCROLLING SURVIVORS */
         #ticker-box {
             position: absolute; top: 20px; right: 20px; 
-            width: 180px; height: 200px; overflow: hidden; z-index: 20; border-color: #ff0055;
+            width: 170px; height: 250px; overflow: hidden; z-index: 20; border-color: #ff0055;
         }
-        #ticker-header { color: #ff0055; font-weight: bold; text-align: center; font-size: 14px; margin-bottom: 5px; border-bottom: 1px solid #555; }
+        #ticker-header { color: #ff0055; font-weight: bold; text-align: center; font-size: 14px; margin-bottom: 5px; border-bottom: 1px solid rgba(255,255,255,0.3); }
         #ticker-list { list-style: none; padding: 0; margin: 0; text-align: center; animation: scrollUp 20s linear infinite; }
-        .ticker-item { font-size: 14px; padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.1); }
-        @keyframes scrollUp { 0% { transform: translateY(0); } 100% { transform: translateY(-100%); } }
+        .ticker-item { font-size: 13px; padding: 3px 0; border-bottom: 1px solid rgba(255,255,255,0.1); }
 
-        /* AUTOMATIC WINNER SCREEN */
+        @keyframes scrollUp { 
+            0% { transform: translateY(0); } 
+            100% { transform: translateY(-100%); } 
+        }
+
+        /* WINNER SCREEN (Auto) */
         #winner-screen {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.92); display: none;
@@ -58,23 +83,32 @@
         #winner-emoji { font-size: 120px; margin-bottom: 10px; }
         #winner-text { font-size: 50px; color: gold; margin: 0; text-shadow: 0 0 20px gold; text-transform: uppercase;}
         
-        /* COUNTDOWN TEXT STYLES */
         #countdown-box { margin-top: 30px; }
         #timer-text { font-size: 40px; color: #00ffea; font-weight: bold; font-family: monospace; }
-        #cta-text { font-size: 22px; color: #fff; margin-top: 10px; animation: blink 1s infinite; }
+        #cta-text { font-size: 20px; color: #fff; margin-top: 10px; animation: blink 1s infinite; }
         @keyframes blink { 50% { opacity: 0.5; } }
 
     </style>
 </head>
 <body>
 
+    <audio id="bg-music" loop>
+        <source src="https://incompetech.com/music/royalty-free/mp3-royaltyfree/Volatile%20Reaction.mp3" type="audio/mp3">
+    </audio>
+
     <div class="stars"></div>
     <div class="twinkling"></div>
 
-    <div id="leaderboard" class="ui-box">
-        <h3>🏆 Wins</h3>
-        <div id="lb-content">Loading...</div>
+    <div id="music-overlay" onclick="startEverything()">
+        🔴 TAP TO START LIVE
     </div>
+
+    <div id="leaderboard" class="ui-box">
+        <h3>🏆 TOTAL WINS</h3>
+        <div style="overflow:hidden; height:210px; position:relative;">
+            <div id="lb-list">Loading...</div>
+        </div>
+        </div>
 
     <div id="top-ui">
         <h1>BATTLE ROYALE</h1>
@@ -83,7 +117,7 @@
 
     <div id="ticker-box" class="ui-box">
         <div id="ticker-header">SURVIVORS</div>
-        <div style="overflow:hidden; height:160px; position:relative;">
+        <div style="overflow:hidden; height:210px; position:relative;">
             <ul id="ticker-list"></ul>
         </div>
     </div>
@@ -91,9 +125,8 @@
     <div id="winner-screen">
         <div id="winner-emoji" class="anim-text"></div>
         <h1 id="winner-text"></h1>
-        
         <div id="countdown-box">
-            <div id="timer-text">NEXT ROUND: 10s</div>
+            <div id="timer-text">NEXT: 10s</div>
             <div id="cta-text">👇 Comment Your Flag for LUCK! 🍀</div>
         </div>
     </div>
@@ -101,6 +134,19 @@
     <div id="canvas-container"></div>
 
     <script>
+        // --- STARTUP ---
+        function startEverything() {
+            const music = document.getElementById('bg-music');
+            music.volume = 0.5;
+            music.play().then(() => {
+                document.getElementById('music-overlay').style.display = 'none';
+            }).catch(e => console.log("Audio Error:", e));
+        }
+
+        // Auto-click attempt
+        window.onload = () => { document.getElementById('bg-music').play().catch(()=>{}); };
+
+        // --- PHYSICS SETUP ---
         const Engine = Matter.Engine, Render = Matter.Render, Runner = Matter.Runner,
               Bodies = Matter.Bodies, Composite = Matter.Composite, Events = Matter.Events, Body = Matter.Body;
 
@@ -117,6 +163,7 @@
             options: { width: width, height: height, wireframes: false, background: 'transparent' }
         });
 
+        // --- DATA ---
         const countryData = [
             {code:"IN", name:"India", emoji:"🇮🇳"}, {code:"US", name:"USA", emoji:"🇺🇸"}, {code:"GB", name:"UK", emoji:"🇬🇧"}, 
             {code:"CA", name:"Canada", emoji:"🇨🇦"}, {code:"JP", name:"Japan", emoji:"🇯🇵"}, {code:"BR", name:"Brazil", emoji:"🇧🇷"},
@@ -137,7 +184,7 @@
             {code:"AE", name:"UAE", emoji:"🇦🇪"}, {code:"QA", name:"Qatar", emoji:"🇶🇦"}
         ];
 
-        // --- SOUNDS ---
+        // --- SOUND EFFECTS ---
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         function playSound(type) {
             if (audioCtx.state === 'suspended') audioCtx.resume();
@@ -147,24 +194,31 @@
             const now = audioCtx.currentTime;
             
             if (type === 'hit') {
-                osc.frequency.setValueAtTime(300 + Math.random()*200, now);
-                osc.frequency.exponentialRampToValueAtTime(50, now+0.1);
-                gain.gain.setValueAtTime(0.1, now); gain.gain.linearRampToValueAtTime(0, now+0.1);
-                osc.start(now); osc.stop(now+0.1);
+                osc.type = 'triangle'; // Sharper hit
+                osc.frequency.setValueAtTime(200 + Math.random()*100, now);
+                osc.frequency.exponentialRampToValueAtTime(50, now+0.05);
+                gain.gain.setValueAtTime(0.05, now); gain.gain.linearRampToValueAtTime(0, now+0.05);
+                osc.start(now); osc.stop(now+0.05);
             } else if (type === 'out') {
-                osc.type = 'sawtooth'; osc.frequency.setValueAtTime(600, now);
-                osc.frequency.exponentialRampToValueAtTime(100, now+0.3);
-                gain.gain.setValueAtTime(0.1, now); gain.gain.linearRampToValueAtTime(0, now+0.3);
+                osc.type = 'sawtooth'; osc.frequency.setValueAtTime(400, now);
+                osc.frequency.exponentialRampToValueAtTime(50, now+0.3);
+                gain.gain.setValueAtTime(0.08, now); gain.gain.linearRampToValueAtTime(0, now+0.3);
                 osc.start(now); osc.stop(now+0.3);
             }
         }
 
-        // --- UI UPDATES ---
+        // --- UI UPDATES (SCROLLING) ---
         function updateLeaderboard(winnerName) {
             let data = JSON.parse(localStorage.getItem('flagWins') || '{}');
             if(winnerName) { data[winnerName] = (data[winnerName] || 0) + 1; localStorage.setItem('flagWins', JSON.stringify(data)); }
-            const sorted = Object.entries(data).sort((a,b) => b[1] - a[1]).slice(0, 8);
-            document.getElementById('lb-content').innerHTML = sorted.map(([n,s],i)=> `<div class="lb-item"><span>#${i+1} ${n}</span><span>${s}</span></div>`).join('') || "No Data";
+            
+            // Convert to array and sort
+            const sorted = Object.entries(data).sort((a,b) => b[1] - a[1]);
+            
+            // Build Scrolling List
+            document.getElementById('lb-list').innerHTML = sorted.map(([n,s],i)=> 
+                `<div class="lb-item"><span>${i+1}. ${n}</span><span class="lb-score">${s}</span></div>`
+            ).join('') || "<div style='text-align:center'>No Data</div>";
         }
         updateLeaderboard(null);
 
@@ -179,7 +233,7 @@
             });
         }
 
-        // --- PHYSICS WORLD SETUP ---
+        // --- WORLD ---
         const floor = Bodies.rectangle(width/2, height + 60, width, 100, { isStatic: true, render:{visible:false} });
         const leftWall = Bodies.rectangle(-50, height, 100, height, { isStatic: true });
         const rightWall = Bodies.rectangle(width+50, height, 100, height, { isStatic: true });
@@ -214,7 +268,7 @@
         Composite.add(world, activeFlags);
         updateTicker(activeFlags);
 
-        // --- RENDER LOOP ---
+        // --- RENDER ---
         Events.on(render, 'afterRender', function() {
             const ctx = render.context;
             ctx.shadowBlur = 15; ctx.shadowColor = "#00d2ff"; ctx.fillStyle = "#fff";
@@ -239,7 +293,7 @@
             eliminatedFlags.forEach(b => drawFlag(b, 0.5));
         });
 
-        // --- GAME LOOP & AUTO RESTART LOGIC ---
+        // --- LOOP ---
         let gameActive = true;
         Events.on(engine, 'beforeUpdate', function() {
             if(!gameActive) return;
@@ -266,29 +320,25 @@
                     updateTicker(activeFlags);
                     b.restitution = 0.5; b.friction = 0.5;
 
-                    // WIN CONDITION
                     if (activeFlags.length === 1) {
                         gameActive = false;
                         const winner = activeFlags[0];
                         
-                        // Show Winner Screen
                         const screen = document.getElementById('winner-screen');
                         screen.style.display = 'flex';
                         document.getElementById('winner-emoji').innerText = winner.data.emoji;
                         document.getElementById('winner-text').innerText = winner.data.name + " WINS!";
                         updateLeaderboard(winner.data.name);
 
-                        // START AUTO RESTART COUNTDOWN
                         let timeLeft = 10;
                         const timerText = document.getElementById('timer-text');
                         
                         const interval = setInterval(() => {
                             timeLeft--;
-                            timerText.innerText = `NEXT ROUND: ${timeLeft}s`;
-                            
+                            timerText.innerText = `NEXT: ${timeLeft}s`;
                             if (timeLeft <= 0) {
                                 clearInterval(interval);
-                                location.reload(); // REFRESH PAGE
+                                location.reload();
                             }
                         }, 1000);
                     }
