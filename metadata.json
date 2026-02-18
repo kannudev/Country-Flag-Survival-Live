@@ -1,0 +1,5 @@
+{
+  "name": "Country Flag Battle Royale",
+  "description": "A physics-based marble-race style battle royale where country flags compete to stay inside a rotating ring. Features synthesized audio, particle effects, and Matter.js physics.",
+  "requestFramePermissions": []
+}
