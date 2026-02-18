@@ -1,33 +1,171 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Country Flag Battle Royale</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flag Battle Royale</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
     <style>
-      body {
-        margin: 0;
-        overflow: hidden;
-        background-color: #0f172a;
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      }
-      canvas {
-        display: block;
-      }
+        body { margin: 0; padding: 0; overflow: hidden; background: #1a1a2e; color: white; font-family: sans-serif; }
+        #canvas-container { width: 100vw; height: 100vh; display: flex; justify-content: center; align-items: center; }
+        #ui-layer { position: absolute; top: 20px; left: 0; width: 100%; text-align: center; pointer-events: none; }
+        h1 { margin: 0; font-size: 24px; text-shadow: 2px 2px 4px black; }
+        #counter { font-size: 40px; font-weight: bold; color: #ff0055; }
+        #winner { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 60px; font-weight: bold; color: gold; text-shadow: 0 0 20px rgba(255, 215, 0, 0.8); display: none; text-align: center; }
+        .btn { pointer-events: auto; padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; margin-top: 10px; font-size: 18px; }
     </style>
-  <script type="importmap">
-{
-  "imports": {
-    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
-    "react": "https://esm.sh/react@^19.2.4",
-    "react/": "https://esm.sh/react@^19.2.4/"
-  }
-}
-</script>
 </head>
-  <body>
-    <div id="root"></div>
-  </body>
+<body>
+    <div id="ui-layer">
+        <h1>🚩 Country Battle Royale 🚩</h1>
+        <div id="counter">Remaining: 50</div>
+        <button class="btn" onclick="location.reload()">Restart Game</button>
+    </div>
+    <div id="winner">WINNER!<br><span id="winnertxt"></span></div>
+    <div id="canvas-container"></div>
+
+    <script>
+        const Engine = Matter.Engine, Render = Matter.Render, Runner = Matter.Runner,
+              Bodies = Matter.Bodies, Composite = Matter.Composite, Events = Matter.Events, Body = Matter.Body;
+
+        // Setup Engine
+        const engine = Engine.create();
+        const world = engine.world;
+        const width = window.innerWidth;
+        const height = window.innerHeight;
+
+        const render = Render.create({
+            element: document.getElementById('canvas-container'),
+            engine: engine,
+            options: { width: width, height: height, wireframes: false, background: 'transparent' }
+        });
+
+        // --- GAME SETTINGS ---
+        const ringRadius = Math.min(width, height) * 0.35;
+        const ballSize = Math.max(15, ringRadius / 12);
+        const countries = [
+            "🇮🇳","🇺🇸","🇬🇧","🇨🇦","🇯🇵","🇧🇷","🇩🇪","🇫🇷","🇮🇹","🇷🇺","🇦🇺","🇨🇳","🇰🇷","🇪🇸","🇲🇽","🇮🇩",
+            "🇹🇷","🇸🇦","🇿🇦","🇪🇬","🇦🇷","🇳🇬","🇵🇰","🇧🇩","🇻🇳","🇵🇭","🇹🇭","🇮🇷","🇨🇴","🇵🇱","🇺🇦","🇲🇾",
+            "🇳🇱","🇧🇪","🇸🇪","🇨🇭","🇦🇹","🇵🇹","🇬🇷","🇮🇱","🇸🇬","🇳🇿","🇮🇪","🇩🇰","🇫🇮","🇳🇴","🇨🇿","🇭🇺","🇦🇪","🇶🇦"
+        ];
+
+        // --- AUDIO SYSTEM ---
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        function playSound(type) {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            
+            if (type === 'hit') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(200 + Math.random()*100, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(50, audioCtx.currentTime + 0.1);
+                gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+                osc.start(); osc.stop(audioCtx.currentTime + 0.1);
+            } else if (type === 'out') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(600, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.3);
+                gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.3);
+                osc.start(); osc.stop(audioCtx.currentTime + 0.3);
+            }
+        }
+
+        // --- CREATE RING ---
+        const segments = 30; // parts of the circle
+        const angleStep = (Math.PI * 2) / segments;
+        const ringParts = [];
+        
+        for (let i = 0; i < segments; i++) {
+            if (i === 0 || i === 1) continue; // CREATE GAP
+            const angle = i * angleStep;
+            const x = width/2 + Math.cos(angle) * ringRadius;
+            const y = height/2 + Math.sin(angle) * ringRadius;
+            
+            const rect = Bodies.rectangle(x, y, ringRadius/2, 20, {
+                isStatic: true,
+                angle: angle + Math.PI/2,
+                render: { fillStyle: '#444' }
+            });
+            ringParts.push(rect);
+        }
+        const ring = Body.create({ parts: ringParts, isStatic: true });
+        Composite.add(world, ring);
+
+        // --- SPAWN FLAGS ---
+        const flags = [];
+        countries.forEach((flag, i) => {
+            const ball = Bodies.circle(width/2 + (Math.random()-0.5)*50, height/2 + (Math.random()-0.5)*50, ballSize, {
+                restitution: 0.9, friction: 0.005,
+                render: {
+                    fillStyle: '#fff',
+                    text: { content: flag, size: ballSize * 1.5, color: 'black' } // Custom render logic needed for text
+                },
+                label: 'ball'
+            });
+            ball.flagEmoji = flag; // Store emoji
+            flags.push(ball);
+        });
+        Composite.add(world, flags);
+
+        // Custom Render Loop for Emojis
+        Events.on(render, 'afterRender', function() {
+            const ctx = render.context;
+            flags.forEach(body => {
+                if (!body.render.visible) return;
+                ctx.font = `${ballSize * 1.5}px Arial`;
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                ctx.fillStyle = "black";
+                ctx.fillText(body.flagEmoji, body.position.x, body.position.y + 4);
+            });
+        });
+
+        // --- GAME LOOP ---
+        Events.on(engine, 'beforeUpdate', function() {
+            // Rotate Ring
+            Body.rotate(ring, 0.015);
+
+            // Check eliminations
+            for (let i = flags.length - 1; i >= 0; i--) {
+                const b = flags[i];
+                const dist = Math.hypot(b.position.x - width/2, b.position.y - height/2);
+                
+                // If fallen out
+                if (dist > ringRadius * 1.5 || b.position.y > height) {
+                    Composite.remove(world, b);
+                    flags.splice(i, 1);
+                    playSound('out');
+                    document.getElementById('counter').innerText = `Remaining: ${flags.length}`;
+                    
+                    if (flags.length === 1) {
+                        document.getElementById('winner').style.display = 'block';
+                        document.getElementById('winnertxt').innerText = flags[0].flagEmoji;
+                        // Slow motion end
+                        engine.timing.timeScale = 0.1;
+                    }
+                }
+            }
+        });
+
+        // Collision Sound
+        Events.on(engine, 'collisionStart', (event) => {
+            event.pairs.forEach((pair) => {
+                if (pair.bodyA.speed > 5 || pair.bodyB.speed > 5) playSound('hit');
+            });
+        });
+
+        // Start
+        Render.run(render);
+        const runner = Runner.create();
+        Runner.run(runner, engine);
+
+        // Keep ring centered on resize
+        window.addEventListener('resize', () => location.reload());
+    </script>
+</body>
 </html>
