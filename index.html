@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Flag Battle: Stream Control</title>
+    <title>Flag Battle: Final Audio Fix</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
     <style>
         /* --- SPACE BACKGROUND --- */
@@ -148,16 +148,46 @@
         <h1 id="winner-text"></h1>
         <div id="countdown-box">
             <div id="timer-text">NEXT: 10s</div>
-            <div id="cta-text">👇 Comment Your Flag for LUCK! 🍀</div>
+            <div id="cta-text">👇 Comment Your Country Flag for EXTRA LUCK! 🤞</div>
         </div>
     </div>
 
     <div id="canvas-container"></div>
 
     <script>
+        // --- AUDIO SYSTEM ---
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        
+        // Unlock audio on first interaction
+        window.addEventListener('click', () => {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+        }, { once: true });
+
+        function playSound(type) {
+            if (audioCtx.state === 'suspended') return; // Wait for user interaction
+
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            const now = audioCtx.currentTime;
+            
+            if (type === 'hit') {
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(200 + Math.random()*100, now);
+                osc.frequency.exponentialRampToValueAtTime(50, now+0.05);
+                gain.gain.setValueAtTime(0.05, now); gain.gain.linearRampToValueAtTime(0, now+0.05);
+                osc.start(now); osc.stop(now+0.05);
+            } else if (type === 'out') {
+                osc.type = 'sawtooth'; osc.frequency.setValueAtTime(400, now);
+                osc.frequency.exponentialRampToValueAtTime(50, now+0.3);
+                gain.gain.setValueAtTime(0.08, now); gain.gain.linearRampToValueAtTime(0, now+0.3);
+                osc.start(now); osc.stop(now+0.3);
+            }
+        }
+
         // --- SETTINGS VARIABLES ---
-        let currentRingSpeed = 0.025; // Default
-        let currentChaos = 0.002;     // Default
+        let currentRingSpeed = 0.025; 
+        let currentChaos = 0.002;
 
         function toggleSettings() {
             const el = document.getElementById('settings-modal');
@@ -181,15 +211,13 @@
             options: { width: width, height: height, wireframes: false, background: 'transparent' }
         });
 
-        // --- INPUT LISTENERS (Live Updates) ---
+        // --- INPUT LISTENERS ---
         document.getElementById('speed-ring').addEventListener('input', (e) => {
-            // Map 1-10 slider to 0.005 - 0.08 speed
             const val = parseInt(e.target.value);
             currentRingSpeed = 0.005 + (val * 0.007);
         });
 
         document.getElementById('speed-chaos').addEventListener('input', (e) => {
-            // Map 1-10 slider to 0.0005 - 0.006 force
             const val = parseInt(e.target.value);
             currentChaos = 0.0005 + (val * 0.0006);
         });
@@ -198,7 +226,7 @@
             if(confirm("Are you sure you want to delete all win records?")) {
                 localStorage.removeItem('flagWins');
                 updateLeaderboard(null);
-                toggleSettings(); // Close menu
+                toggleSettings(); 
             }
         }
 
@@ -311,13 +339,13 @@
         Events.on(engine, 'beforeUpdate', function() {
             if(!gameActive) return;
 
-            // USE DYNAMIC SPEED VARIABLE
+            // USE DYNAMIC SPEED
             Body.rotate(ring, currentRingSpeed);
 
             if (engine.timing.timestamp % 30 === 0) {
                 activeFlags.forEach(b => {
                     if(Math.random() > 0.7) {
-                        // USE DYNAMIC CHAOS VARIABLE
+                        // USE DYNAMIC CHAOS
                         Body.applyForce(b, b.position, { 
                             x: (Math.random()-0.5) * currentChaos, 
                             y: (Math.random()-0.5) * currentChaos 
@@ -333,6 +361,9 @@
                 if (dist > ringRadius * 1.5 || b.position.y > ringY + ringRadius + 50) {
                     activeFlags.splice(i, 1);
                     eliminatedFlags.push(b);
+                    
+                    playSound('out'); // <-- Sound RESTORED here
+                    
                     document.getElementById('counter').innerText = activeFlags.length;
                     updateTicker(activeFlags);
                     b.restitution = 0.5; b.friction = 0.5;
@@ -361,6 +392,11 @@
                     }
                 }
             }
+        });
+
+        // <-- Sound RESTORED for collision
+        Events.on(engine, 'collisionStart', e => {
+            e.pairs.forEach(p => { if (p.bodyA.speed > 6 || p.bodyB.speed > 6) playSound('hit'); });
         });
 
         Render.run(render);
